@@ -1014,7 +1014,23 @@ _CONFIGS = [
         save_interval=2_000,
         keep_period=10_000,
     ),
-    #
+    TrainConfig(
+        name="pi05_b3_stack_blocks_latest_chunk16",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_dim=32,  # pi05 is trained with 32-dim actions
+            action_horizon=16,
+        ),
+        data=LeRobotB3DataConfig(repo_id="local/stack_blocks_latest_v21"),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
+        ),
+        num_train_steps=100_000,
+        batch_size=32,
+        save_interval=2_000,
+        keep_period=10_000,
+    ),
+    # 
     # Debugging configs.
     #
     TrainConfig(
