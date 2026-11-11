@@ -13,8 +13,8 @@ import jax.experimental
 import jax.numpy as jnp
 import numpy as np
 import optax
+import swanlab
 import tqdm_loggable.auto as tqdm
-import wandb
 
 import openpi.models.model as _model
 import openpi.shared.array_typing as at
@@ -22,6 +22,7 @@ import openpi.shared.nnx_utils as nnx_utils
 import openpi.training.checkpoints as _checkpoints
 import openpi.training.config as _config
 import openpi.training.data_loader as _data_loader
+import openpi.training.experiment_logging as experiment_logging
 import openpi.training.optimizer as _optimizer
 import openpi.training.sharding as sharding
 import openpi.training.utils as training_utils
@@ -45,29 +46,6 @@ def init_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.handlers[0].setFormatter(formatter)
-
-
-def init_wandb(config: _config.TrainConfig, *, resuming: bool, log_code: bool = False, enabled: bool = True):
-    if not enabled:
-        wandb.init(mode="disabled")
-        return
-
-    ckpt_dir = config.checkpoint_dir
-    if not ckpt_dir.exists():
-        raise FileNotFoundError(f"Checkpoint directory {ckpt_dir} does not exist.")
-    if resuming:
-        run_id = (ckpt_dir / "wandb_id.txt").read_text().strip()
-        wandb.init(id=run_id, resume="must", project=config.project_name)
-    else:
-        wandb.init(
-            name=config.exp_name,
-            config=dataclasses.asdict(config),
-            project=config.project_name,
-        )
-        (ckpt_dir / "wandb_id.txt").write_text(wandb.run.id)
-
-    if log_code:
-        wandb.run.log_code(epath.Path(__file__).parent.parent)
 
 
 def _load_weights_and_validate(loader: _weight_loaders.WeightLoader, params_shape: at.Params) -> at.Params:
@@ -215,7 +193,7 @@ def main(config: _config.TrainConfig):
         overwrite=config.overwrite,
         resume=config.resume,
     )
-    init_wandb(config, resuming=resuming, enabled=config.wandb_enabled)
+    experiment_logging.init_swanlab(config, resuming=resuming)
 
     data_loader = _data_loader.create_data_loader(
         config,
@@ -226,12 +204,15 @@ def main(config: _config.TrainConfig):
     batch = next(data_iter)
     logging.info(f"Initialized data loader:\n{training_utils.array_tree_to_info(batch)}")
 
-    # Log images from first batch to sanity check.
-    images_to_log = [
-        wandb.Image(np.concatenate([np.array(img[i]) for img in batch[0].images.values()], axis=1))
-        for i in range(min(5, len(next(iter(batch[0].images.values())))))
-    ]
-    wandb.log({"camera_views": images_to_log}, step=0)
+    # Log images once; a resumed experiment must keep its original step numbering.
+    if config.swanlab_enabled and not resuming:
+        images_to_log = [
+            experiment_logging.camera_image(
+                np.concatenate([np.array(img[i]) for img in batch[0].images.values()], axis=1)
+            )
+            for i in range(min(5, len(next(iter(batch[0].images.values())))))
+        ]
+        swanlab.log({"camera_views": images_to_log}, step=0)
 
     train_state, train_state_sharding = init_train_state(config, init_rng, mesh, resume=resuming)
     jax.block_until_ready(train_state)
@@ -265,7 +246,8 @@ def main(config: _config.TrainConfig):
             reduced_info = jax.device_get(jax.tree.map(jnp.mean, stacked_infos))
             info_str = ", ".join(f"{k}={v:.4f}" for k, v in reduced_info.items())
             pbar.write(f"Step {step}: {info_str}")
-            wandb.log(reduced_info, step=step)
+            if config.swanlab_enabled:
+                swanlab.log({key: float(value) for key, value in reduced_info.items()}, step=step)
             infos = []
         batch = next(data_iter)
 
@@ -274,6 +256,7 @@ def main(config: _config.TrainConfig):
 
     logging.info("Waiting for checkpoint manager to finish")
     checkpoint_manager.wait_until_finished()
+    swanlab.finish()
 
 
 if __name__ == "__main__":

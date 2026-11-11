@@ -8,7 +8,7 @@ for larger datasets like DROID -- they are working on improving it though). Belo
 
 ## Install
 
-We need a few additional dependencies for RLDS data loading. The RLDS group depends on `tensorflow-cpu==2.15.0`, which only ships wheels for **Python 3.11**. Make sure you create your virtual environment with Python 3.11 before syncing:
+We need a few additional dependencies for RLDS data loading. The RLDS group uses `tensorflow-cpu==2.18.0` to stay compatible with SwanLab's `wrapt` requirement and JAX's `ml-dtypes==0.4.1`. Use Python 3.11 for this environment:
 
 ```bash
 uv python install 3.11

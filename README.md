@@ -154,13 +154,23 @@ Before we can run training, we need to compute the normalization statistics for 
 uv run scripts/compute_norm_stats.py --config-name pi05_libero
 ```
 
+Training metrics, hyperparameters, and sample camera images are tracked with [SwanLab](https://swanlab.cn). After installing dependencies with `uv sync`, log in once:
+
+```bash
+uv run swanlab login
+```
+
 Now we can kick off training with the following command (the `--overwrite` flag is used to overwrite existing checkpoints if you rerun fine-tuning with the same config):
 
 ```bash
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi05_libero --exp-name=my_experiment --overwrite
 ```
 
-The command will log training progress to the console and save checkpoints to the `checkpoints` directory. You can also monitor training progress on the Weights & Biases dashboard. For maximally using the GPU memory, set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.9` before running training -- this enables JAX to use up to 90% of the GPU memory (vs. the default of 75%).
+The command will log training progress to the console and save checkpoints to the `checkpoints` directory. You can also monitor training progress on the SwanLab dashboard. For maximally using the GPU memory, set `XLA_PYTHON_CLIENT_MEM_FRACTION=0.9` before running training -- this enables JAX to use up to 90% of the GPU memory (vs. the default of 75%).
+
+Both JAX and PyTorch training use `project_name` and `exp_name` to organize SwanLab experiments. Online tracking is the default; set `SWANLAB_MODE=cloud` to select it explicitly. The pinned SwanLab 0.7 SDK accepts `cloud`, `offline`, `local`, or `disabled` in this environment variable; `SWANLAB_MODE=online` fails during SDK import, even though `online` is accepted as a Python `init()` argument. Pass `--no-swanlab-enabled` to disable experiment tracking, or set `SWANLAB_MODE=offline` to save logs locally without logging in. Local logs are written to `swanlog/` by default. Offline resume creates a new local experiment segment with the restored training step; it preserves any existing online experiment ID.
+
+When using `--resume`, training reuses the experiment ID in the checkpoint directory's `swanlab_id.txt`. Existing checkpoints from W&B training can also be resumed: if there is no SwanLab ID, a new SwanLab experiment is created and metrics continue at the restored training step. Historical W&B logs are not imported automatically. The logging option is now `swanlab_enabled` (previously `wandb_enabled`).
 
 **Note:** We provide functionality for *reloading* normalization statistics for state / action normalization from pre-training. This can be beneficial if you are fine-tuning to a new task on a robot that was part of our pre-training mixture. For more details on how to reload normalization statistics, see the [norm_stats.md](docs/norm_stats.md) file.
 
