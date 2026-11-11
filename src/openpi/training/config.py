@@ -558,8 +558,8 @@ class TrainConfig:
     # If true, will resume training from the last checkpoint.
     resume: bool = False
 
-    # If true, will enable wandb logging.
-    wandb_enabled: bool = True
+    # If true, will enable SwanLab logging.
+    swanlab_enabled: bool = True
 
     # Used to pass metadata to the policy server.
     policy_metadata: dict[str, Any] | None = None
@@ -1045,7 +1045,7 @@ _CONFIGS = [
             action_dim=32,  # pi05 is trained with 32-dim actions
             action_horizon=50,
         ),
-        data=LeRobotB3DataConfig(repo_id="local/stack_blocks_v21"),
+        data=LeRobotB3DataConfig(repo_id="local/stack_blocks_v4_lerobot_v21"),
         weight_loader=weight_loaders.CheckpointWeightLoader(
             "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
         ),
@@ -1066,7 +1066,7 @@ _CONFIGS = [
         overwrite=True,
         exp_name="debug",
         num_train_steps=10,
-        wandb_enabled=False,
+        swanlab_enabled=False,
     ),
     TrainConfig(
         name="debug_restore",
@@ -1077,7 +1077,7 @@ _CONFIGS = [
         overwrite=True,
         exp_name="debug",
         num_train_steps=10,
-        wandb_enabled=False,
+        swanlab_enabled=False,
     ),
     TrainConfig(
         name="debug_pi05",
@@ -1087,7 +1087,7 @@ _CONFIGS = [
         num_train_steps=10,
         overwrite=True,
         exp_name="debug_pi05",
-        wandb_enabled=False,
+        swanlab_enabled=False,
     ),
     # RoboArena & PolaRiS configs.
     *roboarena_config.get_roboarena_configs(),
