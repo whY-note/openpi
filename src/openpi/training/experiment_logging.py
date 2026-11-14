@@ -26,7 +26,7 @@ def init_swanlab(config: _config.TrainConfig, *, resuming: bool) -> None:
 
     run_id_path = checkpoint_dir / "swanlab_id.txt"
     run_id = None
-    online = mode == "cloud"
+    online = mode in ("cloud", "online")
     if resuming and online and run_id_path.exists():
         run_id = run_id_path.read_text().strip()
         if not run_id:

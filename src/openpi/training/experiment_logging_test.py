@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 import numpy as np
+from PIL import Image
 import pytest
 
 from openpi.training import experiment_logging
@@ -45,7 +46,7 @@ def test_new_experiment_replaces_stale_tracking_id(tmp_path, init_mock):
     assert config["checkpoint_dir"] == str(tmp_path)
 
 
-@pytest.mark.parametrize("mode", [None, "cloud"])
+@pytest.mark.parametrize("mode", [None, "cloud", "online"])
 def test_resume_reuses_swanlab_experiment(tmp_path, init_mock, monkeypatch, mode):
     if mode is not None:
         monkeypatch.setenv("SWANLAB_MODE", mode)
@@ -56,7 +57,7 @@ def test_resume_reuses_swanlab_experiment(tmp_path, init_mock, monkeypatch, mode
 
     assert init_mock.call_args.kwargs["id"] == "existing-swanlab-id"
     assert init_mock.call_args.kwargs["resume"] == "must"
-    assert init_mock.call_args.kwargs["mode"] == "cloud"
+    assert init_mock.call_args.kwargs["mode"] == (mode or "cloud")
     assert (tmp_path / "swanlab_id.txt").read_text() == "existing-swanlab-id"
 
 
@@ -128,21 +129,28 @@ def test_empty_tracking_id_is_not_silently_replaced(tmp_path, init_mock):
 def test_normalized_camera_pixels_retain_color():
     image = experiment_logging.camera_image(np.array([[[-1.0, 0.0, 1.0]]], dtype=np.float32))
 
-    assert np.asarray(image.image_data).tolist() == [[[0, 127, 255]]]
+    with Image.open(image.buffer) as decoded:
+        assert np.asarray(decoded).tolist() == [[[0, 127, 255]]]
 
 
-def test_cloud_environment_is_valid_before_sdk_import(tmp_path):
-    # The SDK validates this variable at import, before our initializer can run.
+@pytest.mark.parametrize("mode", ["cloud", "online"])
+def test_online_environment_is_valid_for_sdk(tmp_path, mode):
     env = {
         **os.environ,
-        "SWANLAB_MODE": "cloud",
+        "SWANLAB_MODE": mode,
         "SWANLAB_SAVE_DIR": str(tmp_path / "settings"),
     }
     result = subprocess.run(
-        [sys.executable, "-c", "import openpi.training.experiment_logging; print('cloud import ok')"],
+        [
+            sys.executable,
+            "-c",
+            "import os; import openpi.training.experiment_logging; "
+            "from swanlab import Settings; "
+            "assert Settings(mode=os.environ['SWANLAB_MODE']).mode == 'online'; print('online mode ok')",
+        ],
         env=env,
         check=True,
         capture_output=True,
         text=True,
     )
-    assert "cloud import ok" in result.stdout
+    assert "online mode ok" in result.stdout

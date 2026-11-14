@@ -8,7 +8,7 @@ for larger datasets like DROID -- they are working on improving it though). Belo
 
 ## Install
 
-We need a few additional dependencies for RLDS data loading. The RLDS group uses `tensorflow-cpu==2.18.0` to stay compatible with SwanLab's `wrapt` requirement and JAX's `ml-dtypes==0.4.1`. Use Python 3.11 for this environment:
+We need a few additional dependencies for RLDS data loading. The RLDS group uses `tensorflow-cpu==2.20.0` to support SwanLab 0.9's protobuf 6 requirement. `ml-dtypes==0.5.1` is compatible with both this TensorFlow version and JAX 0.5.3. Use Python 3.11 for this environment:
 
 ```bash
 uv python install 3.11
