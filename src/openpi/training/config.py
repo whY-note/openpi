@@ -18,6 +18,7 @@ import openpi.models.pi0_config as pi0_config
 import openpi.models.pi0_fast as pi0_fast
 import openpi.models.tokenizer as _tokenizer
 import openpi.policies.aloha_policy as aloha_policy
+import openpi.policies.b3_eef_policy as b3_eef_policy
 import openpi.policies.b3_policy as b3_policy
 import openpi.policies.droid_policy as droid_policy
 import openpi.policies.libero_policy as libero_policy
@@ -382,8 +383,43 @@ class LeRobotB3DataConfig(DataConfigFactory):
             self.create_base_config(assets_dirs, model_config),
             repack_transforms=repack_transforms,
             data_transforms=_transforms.Group(
-                inputs=[b3_policy.B3Inputs()], 
+                inputs=[b3_policy.B3Inputs()],
                 outputs=[b3_policy.B3Outputs()]
+            ),
+            model_transforms=ModelTransformFactory()(model_config),
+            action_sequence_keys=("action",),
+            prompt_from_task=True,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class LeRobotB3EEFDataConfig(DataConfigFactory):
+    """B3: absolute EEF state/actions (16), xyzw quaternions, three cameras."""
+
+    @override
+    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
+        repack_transforms = _transforms.Group(
+            inputs=[
+                _transforms.RepackTransform(
+                    {
+                        "observation.state": "observation.state",
+                        "observation.images.front_camera": "observation.images.front_camera",
+                        "observation.images.left_wrist_camera": "observation.images.left_wrist_camera",
+                        "observation.images.right_wrist_camera": "observation.images.right_wrist_camera",
+                        "actions": "action",
+                        "prompt": "prompt",
+                    }
+                )
+            ]
+        )
+        # Keep absolute poses. Elementwise DeltaActions is not a valid relative
+        # rotation transform for the xyzw quaternion fields in this dataset.
+        return dataclasses.replace(
+            self.create_base_config(assets_dirs, model_config),
+            repack_transforms=repack_transforms,
+            data_transforms=_transforms.Group(
+                inputs=[b3_eef_policy.B3EEFInputs()],
+                outputs=[b3_eef_policy.B3EEFOutputs()],
             ),
             model_transforms=ModelTransformFactory()(model_config),
             action_sequence_keys=("action",),
@@ -558,7 +594,9 @@ class TrainConfig:
     # If true, will resume training from the last checkpoint.
     resume: bool = False
 
-    # If true, will enable SwanLab logging.
+    # Used by scripts/train.py and scripts/train_pytorch.py for W&B logging.
+    wandb_enabled: bool = True
+    # If true, will enable SwanLab logging (requires a SwanLab training entrypoint).
     swanlab_enabled: bool = True
 
     # Used to pass metadata to the policy server.
@@ -967,7 +1005,7 @@ _CONFIGS = [
         num_train_steps=20_000,
     ),
     #
-    # B3 Arm real-world configs. These configs are used to demonstrate how to train on a real robot dataset. 
+    # B3 Arm real-world configs. These configs are used to demonstrate how to train on a real robot dataset.
     #
     # B3 Arm: multi-road data -> choose nearest image -> lerobot format
     # TrainConfig(
@@ -1054,7 +1092,25 @@ _CONFIGS = [
         save_interval=2_000,
         keep_period=10_000,
     ),
-    # 
+
+    # B3 Arm: step data (already use latest image) -> lerobot format, with EEF state in observation
+    TrainConfig(
+        name="pi05_b3_stack_blocks_v5_eef",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_dim=32,  # pi05 is trained with 32-dim actions
+            action_horizon=50,
+        ),
+        data=LeRobotB3EEFDataConfig(repo_id="local/stack_blocks_v5_eef_lerobot_v21"),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
+        ),
+        num_train_steps=100_000,
+        batch_size=32,
+        save_interval=2_000,
+        keep_period=10_000,
+    ),
+    #
     # Debugging configs.
     #
     TrainConfig(
@@ -1066,6 +1122,7 @@ _CONFIGS = [
         overwrite=True,
         exp_name="debug",
         num_train_steps=10,
+        wandb_enabled=False,
         swanlab_enabled=False,
     ),
     TrainConfig(
@@ -1077,6 +1134,7 @@ _CONFIGS = [
         overwrite=True,
         exp_name="debug",
         num_train_steps=10,
+        wandb_enabled=False,
         swanlab_enabled=False,
     ),
     TrainConfig(
@@ -1087,6 +1145,7 @@ _CONFIGS = [
         num_train_steps=10,
         overwrite=True,
         exp_name="debug_pi05",
+        wandb_enabled=False,
         swanlab_enabled=False,
     ),
     # RoboArena & PolaRiS configs.
