@@ -1110,6 +1110,42 @@ _CONFIGS = [
         save_interval=2_000,
         keep_period=10_000,
     ),
+
+    # B3 Arm: step data (already use latest image) -> lerobot format, with joint state in observation
+    TrainConfig(
+        name="pi05_b3_stack_blocks_v5_joint",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_dim=32,  # pi05 is trained with 32-dim actions
+            action_horizon=50,
+        ),
+        data=LeRobotB3DataConfig(repo_id="local/stack_blocks_v5_joint_lerobot_v21"),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
+        ),
+        num_train_steps=100_000,
+        batch_size=32,
+        save_interval=2_000,
+        keep_period=10_000,
+    ),
+
+    # B3 Arm: step data (already use latest image) -> lerobot format, with EEF state in observation
+    TrainConfig(
+        name="pi05_b3_pour_tea_eef",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            action_dim=32,  # pi05 is trained with 32-dim actions
+            action_horizon=50,
+        ),
+        data=LeRobotB3EEFDataConfig(repo_id="local/pour_tea_eef_lerobot_v21"),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
+        ),
+        num_train_steps=100_000,
+        batch_size=32,
+        save_interval=2_000,
+        keep_period=10_000,
+    ),
     #
     # Debugging configs.
     #
