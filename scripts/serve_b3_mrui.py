@@ -37,8 +37,8 @@ def create_policy(args: Args) -> _policy.Policy:
         ]
     )
     return _policy_config.create_trained_policy(
-        # _config.get_config("pi05_b3_stack_blocks_v5_eef"),
-        _config.get_config("pi05_b3_pour_tea_eef"),
+        _config.get_config("pi05_b3_stack_blocks_eef"),
+        # _config.get_config("pi05_b3_pour_tea_eef"),
         args.checkpoint_dir,
         repack_transforms=repack,
     )

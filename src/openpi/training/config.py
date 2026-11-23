@@ -973,7 +973,7 @@ _CONFIGS = [
     #
     # B3 Arm data in lerobot format, with EEF state in observation
     TrainConfig(
-        name="pi05_b3_stack_blocks_v5_eef",
+        name="pi05_b3_stack_blocks_eef",
         model=pi0_config.Pi0Config(
             pi05=True,
             action_dim=32,  # pi05 is trained with 32-dim actions
