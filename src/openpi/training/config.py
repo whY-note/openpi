@@ -19,7 +19,6 @@ import openpi.models.pi0_fast as pi0_fast
 import openpi.models.tokenizer as _tokenizer
 import openpi.policies.aloha_policy as aloha_policy
 import openpi.policies.b3_eef_policy as b3_eef_policy
-import openpi.policies.b3_policy as b3_policy
 import openpi.policies.droid_policy as droid_policy
 import openpi.policies.libero_policy as libero_policy
 import openpi.shared.download as _download
@@ -354,41 +353,6 @@ class LeRobotLiberoDataConfig(DataConfigFactory):
             repack_transforms=repack_transform,
             data_transforms=data_transforms,
             model_transforms=model_transforms,
-        )
-
-
-@dataclasses.dataclass(frozen=True)
-class LeRobotB3DataConfig(DataConfigFactory):
-    """B3: joint state (14), Cartesian pose/gripper actions (16), three cameras."""
-
-    @override
-    def create(self, assets_dirs: pathlib.Path, model_config: _model.BaseModelConfig) -> DataConfig:
-        repack_transforms = _transforms.Group(
-            inputs=[
-                _transforms.RepackTransform(
-                    {
-                        "observation.state": "observation.state",
-                        "observation.images.front_camera": "observation.images.front_camera",
-                        "observation.images.left_wrist_camera": "observation.images.left_wrist_camera",
-                        "observation.images.right_wrist_camera": "observation.images.right_wrist_camera",
-                        "actions": "action",
-                        "prompt": "prompt",
-                    }
-                )
-            ]
-        )
-        # State is joint angles, actions are Cartesian poses: subtracting state
-        # from actions (DeltaActions) would mix different representations.
-        return dataclasses.replace(
-            self.create_base_config(assets_dirs, model_config),
-            repack_transforms=repack_transforms,
-            data_transforms=_transforms.Group(
-                inputs=[b3_policy.B3Inputs()],
-                outputs=[b3_policy.B3Outputs()]
-            ),
-            model_transforms=ModelTransformFactory()(model_config),
-            action_sequence_keys=("action",),
-            prompt_from_task=True,
         )
 
 
@@ -1007,93 +971,7 @@ _CONFIGS = [
     #
     # B3 Arm real-world configs. These configs are used to demonstrate how to train on a real robot dataset.
     #
-    # B3 Arm: multi-road data -> choose nearest image -> lerobot format
-    # TrainConfig(
-    #     name="pi05_b3_stack_blocks",
-    #     model=pi0_config.Pi0Config(
-    #         pi05=True,
-    #         action_dim=32,  # pi05 is trained with 32-dim actions
-    #         action_horizon=16,
-    #     ),
-    #     data=LeRobotB3DataConfig(repo_id="local/stack_blocks_lerobot_v21"),
-    #     weight_loader=weight_loaders.CheckpointWeightLoader(
-    #         "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
-    #     ),
-    #     num_train_steps=100_000,
-    #     batch_size=256,
-    #     save_interval=2_000,
-    #     keep_period=10_000,
-    # ),
-    # TrainConfig(
-    #     name="pi05_b3_stack_blocks_chunk50",
-    #     model=pi0_config.Pi0Config(
-    #         pi05=True,
-    #         action_dim=32,  # pi05 is trained with 32-dim actions
-    #         action_horizon=50,
-    #     ),
-    #     data=LeRobotB3DataConfig(repo_id="local/stack_blocks_lerobot_v21"),
-    #     weight_loader=weight_loaders.CheckpointWeightLoader(
-    #         "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
-    #     ),
-    #     num_train_steps=100_000,
-    #     batch_size=32,
-    #     save_interval=2_000,
-    #     keep_period=10_000,
-    # ),
-
-    # B3 Arm: multi-road data -> choose latest image -> lerobot format
-    # TrainConfig(
-    #     name="pi05_b3_stack_blocks_latest",
-    #     model=pi0_config.Pi0Config(
-    #         pi05=True,
-    #         action_dim=32,  # pi05 is trained with 32-dim actions
-    #         action_horizon=50,
-    #     ),
-    #     data=LeRobotB3DataConfig(repo_id="local/stack_blocks_latest_v21"),
-    #     weight_loader=weight_loaders.CheckpointWeightLoader(
-    #         "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
-    #     ),
-    #     num_train_steps=100_000,
-    #     batch_size=32,
-    #     save_interval=2_000,
-    #     keep_period=10_000,
-    # ),
-    # TrainConfig(
-    #     name="pi05_b3_stack_blocks_latest_chunk16",
-    #     model=pi0_config.Pi0Config(
-    #         pi05=True,
-    #         action_dim=32,  # pi05 is trained with 32-dim actions
-    #         action_horizon=16,
-    #     ),
-    #     data=LeRobotB3DataConfig(repo_id="local/stack_blocks_latest_v21"),
-    #     weight_loader=weight_loaders.CheckpointWeightLoader(
-    #         "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
-    #     ),
-    #     num_train_steps=100_000,
-    #     batch_size=32,
-    #     save_interval=2_000,
-    #     keep_period=10_000,
-    # ),
-
-    # B3 Arm: step data (already use latest image) -> lerobot format
-    TrainConfig(
-        name="pi05_b3_stack_blocks_v4",
-        model=pi0_config.Pi0Config(
-            pi05=True,
-            action_dim=32,  # pi05 is trained with 32-dim actions
-            action_horizon=50,
-        ),
-        data=LeRobotB3DataConfig(repo_id="local/stack_blocks_v4_lerobot_v21"),
-        weight_loader=weight_loaders.CheckpointWeightLoader(
-            "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
-        ),
-        num_train_steps=100_000,
-        batch_size=32,
-        save_interval=2_000,
-        keep_period=10_000,
-    ),
-
-    # B3 Arm: step data (already use latest image) -> lerobot format, with EEF state in observation
+    # B3 Arm data in lerobot format, with EEF state in observation
     TrainConfig(
         name="pi05_b3_stack_blocks_v5_eef",
         model=pi0_config.Pi0Config(
@@ -1111,25 +989,7 @@ _CONFIGS = [
         keep_period=10_000,
     ),
 
-    # B3 Arm: step data (already use latest image) -> lerobot format, with joint state in observation
-    TrainConfig(
-        name="pi05_b3_stack_blocks_v5_joint",
-        model=pi0_config.Pi0Config(
-            pi05=True,
-            action_dim=32,  # pi05 is trained with 32-dim actions
-            action_horizon=50,
-        ),
-        data=LeRobotB3DataConfig(repo_id="local/stack_blocks_v5_joint_lerobot_v21"),
-        weight_loader=weight_loaders.CheckpointWeightLoader(
-            "/dataset-v2/haowenyan/project/openpi/checkpoints/pi05_base/params"
-        ),
-        num_train_steps=100_000,
-        batch_size=32,
-        save_interval=2_000,
-        keep_period=10_000,
-    ),
-
-    # B3 Arm: step data (already use latest image) -> lerobot format, with EEF state in observation
+    # B3 Arm data in lerobot format, with EEF state in observation
     TrainConfig(
         name="pi05_b3_pour_tea_eef",
         model=pi0_config.Pi0Config(
